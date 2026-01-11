@@ -1,0 +1,17 @@
+[
+    {
+        "UpdateStageName": "Create Server Directory",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Manual Binary Upload Required",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/echo",
+        "UpdateSourceArgs": "Extraction server binary must be manually uploaded. Please upload 'server' (Linux) or 'server.exe' (Windows) to {{$FullRootDir}}",
+        "SkipOnFailure": true
+    }
+]

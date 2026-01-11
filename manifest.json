@@ -1,9 +1,9 @@
 {
-	"id": "ec280171-c67b-4cf8-923f-dc27fea91ee1",
-	"authors": ["CubeCoders Limited", "AMP Community"],
-	"origin": "https://github.com/CubeCoders/AMPTemplates.git",
-	"url": "https://github.com/CubeCoders/AMPTemplates",
+	"id": "kkolk-extraction-2026",
+	"authors": ["CubeCoders Limited", "AMP Community", "kkolk"],
+	"origin": "https://github.com/kkolk/AMPTemplates.git",
+	"url": "https://github.com/kkolk/AMPTemplates",
 	"imagefile": "",
-	"prefix": "",
+	"prefix": "kkolk-",
 	"repotype": "AppTemplates"
 }

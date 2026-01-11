@@ -1,0 +1,9 @@
+[
+    {
+        "Protocol": "UDP",
+        "Port": 5000,
+        "Ref": "ServerPort",
+        "Name": "Game Port (QUIC)",
+        "Description": "UDP port for QUIC game traffic"
+    }
+]
