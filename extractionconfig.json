@@ -45,50 +45,6 @@
         "EnumValues": {}
     },
     {
-        "DisplayName": "Enable Network Simulation",
-        "Category": "Extraction:joystick",
-        "Subcategory": "Testing:bug_report:1",
-        "Description": "If enabled, simulates network latency for testing client prediction. Use Server Lag value to configure latency",
-        "Keywords": "network,simulation,lag,latency,testing",
-        "FieldName": "EnableServerLag",
-        "InputType": "checkbox",
-        "ParamFieldName": "EnableServerLag",
-        "DefaultValue": "false",
-        "EnumValues": {
-            "False": "false",
-            "True": "true"
-        }
-    },
-    {
-        "DisplayName": "Server Lag (ms)",
-        "Category": "Extraction:joystick",
-        "Subcategory": "Testing:bug_report:1",
-        "Description": "Simulated network latency in milliseconds. Jitter is automatically calculated as 20% of this value. Only applies when Enable Network Simulation is checked. Use 50-100ms for realistic testing",
-        "Keywords": "lag,latency,simulation,network,jitter",
-        "FieldName": "ServerLag",
-        "InputType": "number",
-        "ParamFieldName": "ServerLag",
-        "IncludeInCommandLine": false,
-        "DefaultValue": "0",
-        "Placeholder": "50",
-        "MinValue": "0",
-        "MaxValue": "1000",
-        "Suffix": "ms",
-        "EnumValues": {}
-    },
-    {
-        "DisplayName": "Server Lag Arguments",
-        "Category": "Extraction:joystick",
-        "Subcategory": "Testing:bug_report:1",
-        "Description": "Internal field for conditional server lag argument",
-        "Keywords": "lag,arguments",
-        "FieldName": "ServerLagArgs",
-        "InputType": "hidden",
-        "ParamFieldName": "ServerLagArgs",
-        "DefaultValue": "{{#if EnableServerLag}}--server-lag={{ServerLag}}{{/if}}",
-        "EnumValues": {}
-    },
-    {
         "DisplayName": "Custom Command Line Arguments",
         "Category": "Extraction:joystick",
         "Subcategory": "Advanced:settings:1",
