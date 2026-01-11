@@ -1,8 +1,8 @@
 [
     {
         "DisplayName": "Server IP Binding",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Network Settings:electrical_services:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Network:electrical_services:1",
         "Description": "Sets the IP address the server will bind to. 0.0.0.0 binds to all interfaces",
         "Keywords": "ip,bind,address,network",
         "FieldName": "$ApplicationIPBinding",
@@ -14,8 +14,8 @@
     },
     {
         "DisplayName": "Server Port",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Network Settings:electrical_services:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Network:electrical_services:1",
         "Description": "Sets the UDP port the server will listen on for QUIC connections",
         "Keywords": "port,udp,quic,network",
         "FieldName": "$ServerPort",
@@ -30,8 +30,8 @@
     },
     {
         "DisplayName": "Maximum Players",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Game Settings:sports_esports:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Game:sports_esports:1",
         "Description": "Sets the maximum number of players allowed on the server. Extraction is designed for 1-8 players",
         "Keywords": "max,players,limit",
         "FieldName": "$MaxUsers",
@@ -46,8 +46,8 @@
     },
     {
         "DisplayName": "Enable Network Simulation",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Testing & Debug:bug_report:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Testing:bug_report:1",
         "Description": "If enabled, simulates network latency for testing client prediction. Use Server Lag value to configure latency",
         "Keywords": "network,simulation,lag,latency,testing",
         "FieldName": "EnableServerLag",
@@ -61,8 +61,8 @@
     },
     {
         "DisplayName": "Server Lag (ms)",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Testing & Debug:bug_report:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Testing:bug_report:1",
         "Description": "Simulated network latency in milliseconds. Jitter is automatically calculated as 20% of this value. Only applies when Enable Network Simulation is checked. Use 50-100ms for realistic testing",
         "Keywords": "lag,latency,simulation,network,jitter",
         "FieldName": "ServerLag",
@@ -78,8 +78,8 @@
     },
     {
         "DisplayName": "Server Lag Arguments",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Testing & Debug:bug_report:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Testing:bug_report:1",
         "Description": "Internal field for conditional server lag argument",
         "Keywords": "lag,arguments",
         "FieldName": "ServerLagArgs",
@@ -90,8 +90,8 @@
     },
     {
         "DisplayName": "Custom Command Line Arguments",
-        "Category": "Extraction Server:joystick:",
-        "Subcategory": "Advanced:settings:",
+        "Category": "Extraction:joystick",
+        "Subcategory": "Advanced:settings:1",
         "Description": "Sets additional custom command-line arguments to pass to the server. Use with caution",
         "Keywords": "custom,command,line,arguments,parameters",
         "FieldName": "CustomArgs",
