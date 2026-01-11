@@ -7,6 +7,14 @@
         "SkipOnFailure": false
     },
     {
+        "UpdateStageName": "Make Server Executable",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"chmod +x {{$FullRootDir}}server\"",
+        "SkipOnFailure": false
+    },
+    {
         "UpdateStageName": "Manual Binary Upload Required",
         "UpdateSourcePlatform": "All",
         "UpdateSource": "Executable",
