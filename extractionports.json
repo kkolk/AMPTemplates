@@ -2,14 +2,14 @@
     {
         "Protocol": "UDP",
         "Port": 8766,
-        "Ref": "ServerPort",
+        "Ref": "ServerPortUDP",
         "Name": "Game Port (UDP)",
         "Description": "UDP port for QUIC game traffic"
     },
     {
         "Protocol": "TCP",
         "Port": 8766,
-        "Ref": "ServerPort",
+        "Ref": "ServerPortTCP",
         "Name": "Game Port (TCP)",
         "Description": "TCP port for game traffic"
     }
