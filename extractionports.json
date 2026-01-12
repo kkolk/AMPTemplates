@@ -1,7 +1,7 @@
 [
     {
         "Protocol": "UDP",
-        "Port": 4500,
+        "Port": 8766,
         "Ref": "ServerPort",
         "Name": "Game Port (QUIC)",
         "Description": "UDP port for QUIC game traffic"
