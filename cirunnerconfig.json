@@ -41,14 +41,14 @@
         "DisplayName": "Runner Labels",
         "Category": "Test Runner:memory",
         "Subcategory": "Gitea:cloud:1",
-        "Description": "Label:executor pairs. Everything MUST map to :host - there is no container runtime here. Because mapping is per-runner, rust-ci:host serves the same runs-on:[rust-ci] jobs that runner-1 serves with its container image. Do not advertise the docker label: jobs calling the docker CLI will fail.",
+        "Description": "Label:executor pairs. Everything MUST map to :host - there is no container runtime here. Because mapping is per-runner, rust-ci:host serves the same runs-on:[rust-ci] jobs runner-1 serves with a container image. amp:host distinguishes this runner from the homelab ones so a job can be aimed here deliberately. Do not advertise the docker label: jobs calling the docker CLI will fail. Changing labels needs re-registration - delete state/.runner.",
         "Keywords": "labels,runs-on,executor",
         "FieldName": "RunnerLabels",
         "InputType": "text",
         "ParamFieldName": "RunnerLabels",
-        "DefaultValue": "self-hosted:host,linux:host,build:host,rust-ci:host",
+        "DefaultValue": "self-hosted:host,linux:host,build:host,rust-ci:host,amp:host",
         "EnumValues": {},
-        "Placeholder": "self-hosted:host,linux:host,build:host,rust-ci:host"
+        "Placeholder": "self-hosted:host,linux:host,build:host,rust-ci:host,amp:host"
     },
     {
         "DisplayName": "Extra Host Entries",

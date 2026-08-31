@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-cargohome"
+LAUNCHER_REV="2026-08-31-labels"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -213,6 +213,18 @@ if [[ "${RUN_DIAGNOSTICS:-true}" == "true" ]]; then
     run_interruptible diagnose || echo "[diag] diagnostics did not complete"
 fi
 
+# Labels: template settings cannot reach a running instance without an AMP
+# template refresh, so state/labels overrides them the same way hosts.extra
+# does. Changing labels requires re-registration - delete state/.runner.
+if [[ -z "${GITEA_RUNNER_LABELS:-}" && -r "$ROOT/state/labels" ]]; then
+    GITEA_RUNNER_LABELS="$(grep -vE '^[[:space:]]*(#|$)' "$ROOT/state/labels" | paste -sd ',' -)"
+    log "labels loaded from state/labels"
+fi
+# amp:host distinguishes this runner from the homelab ones, which advertise the
+# same general-purpose labels - without it a job cannot be aimed here.
+GITEA_RUNNER_LABELS="${GITEA_RUNNER_LABELS:-self-hosted:host,linux:host,build:host,rust-ci:host,amp:host}"
+log "labels: $GITEA_RUNNER_LABELS"
+
 # --- register (first run only) ----------------------------------------------
 if [[ ! -f state/.runner ]]; then
     [[ -n "${GITEA_RUNNER_REGISTRATION_TOKEN:-}" ]] || \
@@ -225,7 +237,7 @@ if [[ ! -f state/.runner ]]; then
         --instance "$GITEA_INSTANCE_URL" \
         --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
         --name "${GITEA_RUNNER_NAME:-amp-ci-runner}" \
-        --labels "${GITEA_RUNNER_LABELS:-self-hosted:host,linux:host,build:host,rust-ci:host}" \
+        --labels "$GITEA_RUNNER_LABELS" \
         || { diagnose; die "registration failed. If the diag lines above show HTTP 000 the runner cannot reach Gitea at all (routing or ACL); a real HTTP code means it reached Gitea and the token is the problem."; }
     log "registered"
 fi
