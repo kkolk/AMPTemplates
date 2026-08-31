@@ -104,6 +104,16 @@ if [[ ! -x "toolchain/bin/gcc" ]] || [[ ! -x "toolchain/bin/mold" ]]; then
         ./bin/micromamba create -y -q -p "$ROOT/toolchain" -c conda-forge $TOOLCHAIN_PACKAGES
 fi
 
+# Symlink the toolchain into bin/, which every launcher revision already puts on
+# PATH. Relying on run.sh to prepend toolchain/bin couples the toolchain to the
+# launcher version, and the two are uploaded separately.
+if [[ -x "toolchain/bin/gcc" ]]; then
+    for t in gcc g++ cc c++ cpp mold ar ranlib nm strip ld.mold; do
+        [[ -e "toolchain/bin/$t" ]] && ln -sf "$ROOT/toolchain/bin/$t" "bin/$t"
+    done
+    echo ">> linked C toolchain into bin/"
+fi
+
 # --- Node --------------------------------------------------------------------
 # actions/setup-node can fetch its own, but seeding one avoids a download on
 # every cold job and gives workflows a node on PATH without the action.
