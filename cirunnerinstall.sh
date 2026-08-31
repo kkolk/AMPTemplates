@@ -114,6 +114,33 @@ if [[ -x "toolchain/bin/gcc" ]]; then
     echo ">> linked C toolchain into bin/"
 fi
 
+# conda's mold package can leave bin/ld pointing at ld.mold when it is
+# installed before binutils, which silently routes every plain cc link through
+# mold. Point it back at GNU ld; -fuse-ld=mold still selects mold explicitly.
+if [[ -L toolchain/bin/ld ]] && [[ "$(readlink toolchain/bin/ld)" == *mold* ]]; then
+    ln -sf ld.bfd toolchain/bin/ld
+    echo ">> repointed toolchain/bin/ld at GNU ld (was mold)"
+fi
+
+# mold cannot parse conda's *_asneeded.so GNU ld scripts:
+#   INPUT ( AS_NEEDED ( -lgcc_s ) )   ->  "library not found: AS_NEEDED"
+# Rewrite each to name the real shared object directly. Repos that ask for
+# mold (rata pins -C link-arg=-fuse-ld=mold) fail to link without this.
+# Idempotent: only files still containing AS_NEEDED are touched.
+shopt -s nullglob
+for f in toolchain/lib/gcc/*/*/[a-z]*_asneeded.so; do
+    grep -q "AS_NEEDED" "$f" || continue
+    lib=$(grep -o -- '-l[a-z_]*' "$f" | head -1 | sed 's/^-l//')
+    [[ -n "$lib" ]] || continue
+    real=$(ls "toolchain/lib/lib${lib}".so.* "$(dirname "$f")/lib${lib}".so.* 2>/dev/null \
+           | grep -v asneeded | head -1)
+    if [[ -n "$real" ]]; then
+        printf 'INPUT ( %s )\n' "$(readlink -f "$real")" > "$f"
+        echo ">> patched $(basename "$f") for mold"
+    fi
+done
+shopt -u nullglob
+
 # --- Node --------------------------------------------------------------------
 # actions/setup-node can fetch its own, but seeding one avoids a download on
 # every cold job and gives workflows a node on PATH without the action.
