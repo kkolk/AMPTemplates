@@ -23,6 +23,21 @@ HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 [[ -n "${TS_AUTHKEY:-}" ]] || die "Tailscale Auth Key is not set in the instance settings"
 [[ -n "${GITEA_INSTANCE_URL:-}" ]] || die "Gitea Instance URL is not set"
 
+
+# Bash defers trap handlers until the current foreground command returns, so a
+# long-running call in the foreground makes this script deaf to SIGTERM. Run
+# them backgrounded and wait, which lets the trap fire immediately.
+child_pid=""
+run_interruptible() {
+    "$@" &
+    local pid=$!
+    child_pid=$pid
+    wait "$pid"
+    local rc=$?
+    child_pid=""
+    return $rc
+}
+
 # --- tailscale ---------------------------------------------------------------
 log "starting tailscaled (userspace networking)"
 ./bin/tailscaled \
@@ -132,7 +147,7 @@ diagnose() {
 }
 
 if [[ "${RUN_DIAGNOSTICS:-true}" == "true" ]]; then
-    diagnose
+    run_interruptible diagnose || echo "[diag] diagnostics did not complete"
 fi
 
 # --- register (first run only) ----------------------------------------------
@@ -140,7 +155,10 @@ if [[ ! -f state/.runner ]]; then
     [[ -n "${GITEA_RUNNER_REGISTRATION_TOKEN:-}" ]] || \
         die "no registration token set, and this runner has not registered yet"
     log "registering as ${GITEA_RUNNER_NAME:-amp-ci-runner}"
-    ./bin/act_runner --config state/config.yaml register --no-interactive \
+    # act_runner retries the instance ping indefinitely; without a bound a bad
+    # route leaves the instance unstoppable rather than failing visibly.
+    run_interruptible timeout "${REGISTER_TIMEOUT:-120}" \
+        ./bin/act_runner --config state/config.yaml register --no-interactive \
         --instance "$GITEA_INSTANCE_URL" \
         --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
         --name "${GITEA_RUNNER_NAME:-amp-ci-runner}" \
@@ -152,9 +170,20 @@ fi
 cleanup() {
     trap - TERM INT EXIT
     log "shutting down"
-    [[ -n "${runner_pid:-}" ]] && kill -TERM "$runner_pid" 2>/dev/null
-    [[ -n "${runner_pid:-}" ]] && wait "$runner_pid" 2>/dev/null
-    kill -TERM "$tailscaled_pid" 2>/dev/null
+    for pid in "${child_pid:-}" "${runner_pid:-}"; do
+        [[ -n "$pid" ]] && kill -TERM "$pid" 2>/dev/null
+    done
+    for pid in "${child_pid:-}" "${runner_pid:-}"; do
+        [[ -n "$pid" ]] && { wait "$pid" 2>/dev/null || true; }
+    done
+    if [[ -n "${tailscaled_pid:-}" ]]; then
+        kill -TERM "$tailscaled_pid" 2>/dev/null
+        for _ in $(seq 10); do
+            kill -0 "$tailscaled_pid" 2>/dev/null || break
+            sleep 1
+        done
+        kill -KILL "$tailscaled_pid" 2>/dev/null
+    fi
     log "stopped"
 }
 trap cleanup TERM INT EXIT
