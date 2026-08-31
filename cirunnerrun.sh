@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-tar"
+LAUNCHER_REV="2026-08-31-pkgconfig"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -139,6 +139,10 @@ mkdir -p "$CI_CACHE_DIR"
 # so gcc, cc and mold resolve for repos that name them explicitly.
 if [[ -x "$ROOT/toolchain/bin/gcc" ]]; then
     export PATH="$ROOT/toolchain/bin:$PATH"
+    # -sys crates locate their C libraries through pkg-config, which searches
+    # system paths by default and finds nothing here: OpenSSL and friends live
+    # in the instance's conda prefix, not on the host.
+    export PKG_CONFIG_PATH="$ROOT/toolchain/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 fi
 
 # --- runner config -----------------------------------------------------------
@@ -173,6 +177,7 @@ runner:
     HTTPS_PROXY: "$HTTPS_PROXY"
     NO_PROXY: "$NO_PROXY"
     TAR_OPTIONS: "$TAR_OPTIONS"
+    PKG_CONFIG_PATH: "${PKG_CONFIG_PATH:-}"
     CARGO_HOME: "$CARGO_HOME"
     RUSTUP_HOME: "$RUSTUP_HOME"
     PATH: "$PATH"

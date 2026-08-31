@@ -210,13 +210,13 @@
         "DisplayName": "C Toolchain Packages",
         "Category": "Test Runner:memory",
         "Subcategory": "Versions:inventory:4",
-        "Description": "conda-forge packages installed into the instance as the C toolchain. binutils is required separately - the gcc package ships no ar, and cc-rs needs it to build vendored C such as ring. Add cmake or pkg-config here if a crate needs them.",
+        "Description": "conda-forge packages installed into the instance as the build toolchain. binutils is separate from gcc (cc-rs needs ar). pkg-config and openssl are needed by -sys crates such as openssl-sys; PKG_CONFIG_PATH is pointed at this prefix automatically. Add more library packages here as crates require them.",
         "Keywords": "gcc,mold,linker,toolchain,conda",
         "FieldName": "ToolchainPackages",
         "InputType": "text",
         "ParamFieldName": "ToolchainPackages",
-        "DefaultValue": "gcc gxx binutils make mold",
-        "Placeholder": "gcc gxx binutils make mold",
+        "DefaultValue": "gcc gxx binutils make cmake pkg-config openssl mold",
+        "Placeholder": "gcc gxx binutils make cmake pkg-config openssl mold",
         "EnumValues": {}
     },
     {

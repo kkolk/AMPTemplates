@@ -13,7 +13,7 @@ ACT_RUNNER_VERSION="${ACT_RUNNER_VERSION:-0.2.13}"
 TAILSCALE_VERSION="${TAILSCALE_VERSION:-1.86.2}"
 RUST_TOOLCHAIN="${RUST_TOOLCHAIN:-stable}"
 NODE_VERSION="${NODE_VERSION:-22.11.0}"
-TOOLCHAIN_PACKAGES="${TOOLCHAIN_PACKAGES:-gcc gxx binutils make mold}"
+TOOLCHAIN_PACKAGES="${TOOLCHAIN_PACKAGES:-gcc gxx binutils make cmake pkg-config openssl mold}"
 
 # The default locations, deliberately: workflows cache ~/.cargo/registry, and
 # pointing CARGO_HOME into the instance directory would make that cache a
@@ -98,7 +98,8 @@ if [[ ! -x bin/micromamba ]]; then
     chmod +x bin/micromamba
 fi
 
-if [[ ! -x "toolchain/bin/gcc" ]] || [[ ! -x "toolchain/bin/mold" ]] || [[ ! -x "toolchain/bin/ar" ]]; then
+if [[ ! -x "toolchain/bin/gcc" ]] || [[ ! -x "toolchain/bin/mold" ]] \
+   || [[ ! -x "toolchain/bin/ar" ]] || [[ ! -x "toolchain/bin/pkg-config" ]]; then
     echo ">> C toolchain: $TOOLCHAIN_PACKAGES (this is a few hundred MB)"
     MAMBA_ROOT_PREFIX="$ROOT/state/mamba" \
         ./bin/micromamba create -y -q -p "$ROOT/toolchain" -c conda-forge $TOOLCHAIN_PACKAGES
@@ -108,7 +109,7 @@ fi
 # PATH. Relying on run.sh to prepend toolchain/bin couples the toolchain to the
 # launcher version, and the two are uploaded separately.
 if [[ -x "toolchain/bin/gcc" ]]; then
-    for t in gcc g++ cc c++ cpp mold ar ranlib nm strip objcopy objdump make ld.mold; do
+    for t in gcc g++ cc c++ cpp mold ar ranlib nm strip objcopy objdump make cmake pkg-config ld.mold; do
         [[ -e "toolchain/bin/$t" ]] && ln -sf "$ROOT/toolchain/bin/$t" "bin/$t"
     done
     echo ">> linked C toolchain into bin/"
@@ -162,3 +163,4 @@ printf '  node       %s\n' "$(node/bin/node --version 2>/dev/null)"
 printf '  gcc        %s\n' "$(toolchain/bin/gcc --version 2>/dev/null | head -1)"
 printf '  mold       %s\n' "$(toolchain/bin/mold --version 2>/dev/null)"
 printf '  binutils   %s\n' "$(toolchain/bin/ar --version 2>/dev/null | head -1)"
+printf '  openssl    %s\n' "$(PKG_CONFIG_PATH="$ROOT/toolchain/lib/pkgconfig" toolchain/bin/pkg-config --modversion openssl 2>/dev/null)"
