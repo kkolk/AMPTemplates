@@ -7,19 +7,11 @@
         "SkipOnFailure": false
     },
     {
-        "UpdateStageName": "Fetch Launcher Script",
+        "UpdateStageName": "Refresh Launcher and Installer",
         "UpdateSourcePlatform": "Linux",
-        "UpdateSource": "FetchURL",
-        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerrun.sh",
-        "UpdateSourceArgs": "{{$FullRootDir}}run.sh",
-        "SkipOnFailure": false
-    },
-    {
-        "UpdateStageName": "Fetch Installer Script",
-        "UpdateSourcePlatform": "Linux",
-        "UpdateSource": "FetchURL",
-        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerinstall.sh",
-        "UpdateSourceArgs": "{{$FullRootDir}}install.sh",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; curl -fL --retry 3 -o run.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerrun.sh\\\"; curl -fL --retry 3 -o install.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerinstall.sh\\\"; chmod +x run.sh install.sh; echo \\\"launcher and installer refreshed\\\"\"",
         "SkipOnFailure": false
     },
     {
@@ -27,7 +19,7 @@
         "UpdateSourcePlatform": "Linux",
         "UpdateSource": "Executable",
         "UpdateSourceData": "/bin/bash",
-        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; chmod +x run.sh install.sh; exec ./install.sh \\\"{{$FullRootDir}}\\\"\"",
+        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; exec ./install.sh \\\"{{$FullRootDir}}\\\"\"",
         "SkipOnFailure": false
     }
 ]

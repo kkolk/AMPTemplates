@@ -7,19 +7,11 @@
         "SkipOnFailure": false
     },
     {
-        "UpdateStageName": "Fetch Launcher Script",
-        "UpdateSourcePlatform": "Linux",
-        "UpdateSource": "FetchURL",
-        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/k3snoderun.sh",
-        "UpdateSourceArgs": "{{$FullRootDir}}run-node.sh",
-        "SkipOnFailure": false
-    },
-    {
-        "UpdateStageName": "Make Launcher Executable",
+        "UpdateStageName": "Refresh Launcher",
         "UpdateSourcePlatform": "Linux",
         "UpdateSource": "Executable",
         "UpdateSourceData": "/bin/bash",
-        "UpdateSourceArgs": "-c \"chmod +x {{$FullRootDir}}run-node.sh\"",
+        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; curl -fL --retry 3 -o run-node.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/main/k3snoderun.sh\\\"; chmod +x run-node.sh; echo \\\"launcher refreshed\\\"\"",
         "SkipOnFailure": false
     },
     {
