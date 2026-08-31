@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-fetch"
+LAUNCHER_REV="2026-08-31-capacity"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -141,7 +141,16 @@ log:
   level: info
 runner:
   file: $ROOT/state/.runner
-  capacity: ${RUNNER_CAPACITY:-2}
+  # Host-executor jobs get NO cgroup: container.options, which throttles jobs
+  # on the homelab runners, applies only to the container executor. The real
+  # ceiling here is CARGO_BUILD_JOBS in each workflow (4-6) times this number,
+  # against a shared 44-thread box. More slots also keep this runner eligible
+  # for work longer, since a runner at capacity stops competing.
+  #
+  # Beware same-repo concurrency: jobs sharing a persistent CARGO_TARGET_DIR
+  # serialise on cargo's file lock, so those slots sit blocked rather than
+  # doing work. Extra capacity mostly buys parallelism ACROSS repos.
+  capacity: ${RUNNER_CAPACITY:-4}
   timeout: ${RUNNER_TIMEOUT:-3h}
   # Gitea has no runner priority (go-gitea/gitea#27042). Runners poll for work
   # and the first to poll wins, so a short interval biases jobs here without
