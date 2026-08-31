@@ -1,4 +1,4 @@
-Meta.DisplayName=CI Runner (Tailscale)
+Meta.DisplayName=Test Runner
 Meta.Description=Self-contained Gitea Actions runner reaching a tailnet-only Gitea over userspace Tailscale. No root required.
 Meta.OS=Linux
 Meta.AarchSupport=Supported
@@ -27,7 +27,7 @@ Meta.BreakingReleaseNotes=
 Meta.AppConfigId=2e9d4a71-8c53-4f16-b0d7-91a3ce8f4b22
 Meta.ImportableExtensions=[]
 Meta.AppIsMultiIPAware=False
-App.DisplayName=CI Runner
+App.DisplayName=Test Runner
 App.RootDir=./cirunner/
 App.BaseDirectory=./cirunner/
 App.SteamWorkshopDownloadLocation=

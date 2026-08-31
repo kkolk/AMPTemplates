@@ -1,4 +1,4 @@
-# CI Runner (Tailscale) — AMP Generic module template
+# Test Runner — AMP Generic module template
 
 A self-contained Gitea Actions runner that installs and runs entirely as the
 unprivileged AMP user. **No root, no sudo, no container runtime, nothing written
@@ -73,7 +73,7 @@ Since jobs run on the host executor, `actions/cache` reaches the cache server on
 ## Setup
 
 No host prerequisites. Add this repo to AMP's template sources, create a
-**CI Runner (Tailscale)** instance, then fill in:
+**Test Runner** instance, then fill in:
 
 - **Gitea Instance URL** — `https://git.frostbyte.us`
 - **Runner Registration Token** — from Gitea's Actions settings
