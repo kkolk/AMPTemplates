@@ -205,5 +205,18 @@
         "DefaultValue": "22.11.0",
         "EnumValues": {},
         "Placeholder": "22.11.0"
+    },
+    {
+        "DisplayName": "Zig Version",
+        "Category": "Test Runner:memory",
+        "Subcategory": "Versions:inventory:4",
+        "Description": "zig supplies the C compiler and linker. Rust cannot link even a proc-macro build script without one, and a bare host has no gcc.",
+        "Keywords": "zig,cc,linker,compiler",
+        "FieldName": "ZigVersion",
+        "InputType": "text",
+        "ParamFieldName": "ZigVersion",
+        "DefaultValue": "0.13.0",
+        "Placeholder": "0.13.0",
+        "EnumValues": {}
     }
 ]

@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-labels"
+LAUNCHER_REV="2026-08-31-zigcc"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -129,6 +129,19 @@ export CI_CACHE_DIR="$ROOT/cache/ci"
 mkdir -p "$CI_CACHE_DIR"
 [[ -x "$CARGO_HOME/bin/sccache" ]] && export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache"
 
+# No gcc on this host, so point Rust and the cc crate at zig. Both the host and
+# target triples are the same here, so one linker variable covers build scripts
+# and the final link.
+if [[ -x "$ROOT/bin/zig-cc" ]]; then
+    export CC="$ROOT/bin/zig-cc"
+    export CXX="$ROOT/bin/zig-c++"
+    case "$(uname -m)" in
+        x86_64)        export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="$ROOT/bin/zig-cc" ;;
+        aarch64|arm64) export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="$ROOT/bin/zig-cc" ;;
+    esac
+fi
+
+
 # --- runner config -----------------------------------------------------------
 cat > state/config.yaml <<YAML
 log:
@@ -146,6 +159,9 @@ runner:
     NO_PROXY: "$NO_PROXY"
     CARGO_HOME: "$CARGO_HOME"
     RUSTUP_HOME: "$RUSTUP_HOME"
+    CC: "${CC:-}"
+    CXX: "${CXX:-}"
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:-}"
 cache:
   enabled: true
   dir: $ROOT/cache/actions
