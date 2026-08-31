@@ -207,16 +207,16 @@
         "Placeholder": "22.11.0"
     },
     {
-        "DisplayName": "Zig Version",
+        "DisplayName": "C Toolchain Packages",
         "Category": "Test Runner:memory",
         "Subcategory": "Versions:inventory:4",
-        "Description": "zig supplies the C compiler and linker. Rust cannot link even a proc-macro build script without one, and a bare host has no gcc.",
-        "Keywords": "zig,cc,linker,compiler",
-        "FieldName": "ZigVersion",
+        "Description": "conda-forge packages installed into the instance as the C toolchain. Rust cannot link without one, and repos may name specific tools - toolkit pins gcc and mold in .cargo/config.toml, and rustflags there override any linker override the runner sets.",
+        "Keywords": "gcc,mold,linker,toolchain,conda",
+        "FieldName": "ToolchainPackages",
         "InputType": "text",
-        "ParamFieldName": "ZigVersion",
-        "DefaultValue": "0.13.0",
-        "Placeholder": "0.13.0",
+        "ParamFieldName": "ToolchainPackages",
+        "DefaultValue": "gcc gxx mold",
+        "Placeholder": "gcc gxx mold",
         "EnumValues": {}
     }
 ]

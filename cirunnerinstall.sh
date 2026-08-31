@@ -13,7 +13,7 @@ ACT_RUNNER_VERSION="${ACT_RUNNER_VERSION:-0.2.13}"
 TAILSCALE_VERSION="${TAILSCALE_VERSION:-1.86.2}"
 RUST_TOOLCHAIN="${RUST_TOOLCHAIN:-stable}"
 NODE_VERSION="${NODE_VERSION:-22.11.0}"
-ZIG_VERSION="${ZIG_VERSION:-0.13.0}"
+TOOLCHAIN_PACKAGES="${TOOLCHAIN_PACKAGES:-gcc gxx mold}"
 
 # The default locations, deliberately: workflows cache ~/.cargo/registry, and
 # pointing CARGO_HOME into the instance directory would make that cache a
@@ -22,8 +22,8 @@ export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
 export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 
 case "$(uname -m)" in
-    x86_64)        GOARCH=amd64; NODEARCH=x64;   ZIGARCH=x86_64 ;;
-    aarch64|arm64) GOARCH=arm64; NODEARCH=arm64; ZIGARCH=aarch64 ;;
+    x86_64)        GOARCH=amd64; NODEARCH=x64 ;;
+    aarch64|arm64) GOARCH=arm64; NODEARCH=arm64 ;;
     *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
@@ -83,22 +83,26 @@ for tool in cargo-hakari sccache cargo-nextest; do
 done
 
 # --- C toolchain -------------------------------------------------------------
-# Rust needs a linker even to build proc-macro build scripts, and a bare host
-# has no gcc - the rust-ci container image supplied one, this does not. zig is
-# a single self-contained tarball that provides a working C compiler and
-# linker, so it installs unprivileged into the instance directory.
-if [[ ! -x "zig/zig" ]] || ! zig/zig version 2>/dev/null | grep -q "$ZIG_VERSION"; then
-    echo ">> zig $ZIG_VERSION (C compiler and linker)"
-    fetch /tmp/zig.tar.xz \
-        "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${ZIGARCH}-${ZIG_VERSION}.tar.xz"
-    rm -rf zig && mkdir -p zig
-    tar xJf /tmp/zig.tar.xz -C zig --strip-components=1
-    rm -f /tmp/zig.tar.xz
+# Rust needs a linker even for proc-macro build scripts, and a bare host has
+# none - the rust-ci container image supplied the whole toolchain. Repos also
+# pin specific tools: toolkit's .cargo/config.toml sets
+# "-C linker=gcc -C link-arg=-fuse-ld=mold", and rustflags from config override
+# CARGO_TARGET_*_LINKER, so real gcc and mold are required, not a substitute.
+#
+# conda-forge ships both as relocatable packages, so micromamba installs them
+# into the instance directory with no root.
+if [[ ! -x bin/micromamba ]]; then
+    echo ">> micromamba"
+    curl -Ls "https://micro.mamba.pm/api/micromamba/linux-${GOARCH/amd64/64}/latest" \
+        | tar -xj -C . bin/micromamba
+    chmod +x bin/micromamba
 fi
 
-printf '#!/bin/sh\nexec "%s/zig/zig" cc "$@"\n'  "$ROOT" > bin/zig-cc
-printf '#!/bin/sh\nexec "%s/zig/zig" c++ "$@"\n' "$ROOT" > bin/zig-c++
-chmod +x bin/zig-cc bin/zig-c++
+if [[ ! -x "toolchain/bin/gcc" ]] || [[ ! -x "toolchain/bin/mold" ]]; then
+    echo ">> C toolchain: $TOOLCHAIN_PACKAGES (this is a few hundred MB)"
+    MAMBA_ROOT_PREFIX="$ROOT/state/mamba" \
+        ./bin/micromamba create -y -q -p "$ROOT/toolchain" -c conda-forge $TOOLCHAIN_PACKAGES
+fi
 
 # --- Node --------------------------------------------------------------------
 # actions/setup-node can fetch its own, but seeding one avoids a download on
@@ -118,4 +122,5 @@ printf '  act_runner %s\n' "$(bin/act_runner --version 2>/dev/null | head -1)"
 printf '  tailscale  %s\n' "$(bin/tailscaled --version 2>/dev/null | head -1)"
 printf '  cargo      %s\n' "$("$CARGO_HOME/bin/cargo" --version 2>/dev/null)"
 printf '  node       %s\n' "$(node/bin/node --version 2>/dev/null)"
-printf '  zig        %s\n' "$(zig/zig version 2>/dev/null)"
+printf '  gcc        %s\n' "$(toolchain/bin/gcc --version 2>/dev/null | head -1)"
+printf '  mold       %s\n' "$(toolchain/bin/mold --version 2>/dev/null)"
