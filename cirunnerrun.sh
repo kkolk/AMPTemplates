@@ -105,6 +105,36 @@ container:
   force_pull: false
 YAML
 
+
+# --- connectivity diagnostics ------------------------------------------------
+# There is no shell on this host, so the console is the only instrument. Run
+# these before registering: each line isolates one hop, so the first failure
+# tells you which one is broken.
+diagnose() {
+    local host="${GITEA_INSTANCE_URL#*://}"; host="${host%%/*}"
+    echo "--------------------------------------------------------------"
+    echo "[diag] tailnet peers and advertised routes:"
+    $TS status 2>&1 | sed 's/^/[diag]   /' | head -20
+    echo "[diag] accepted subnet routes:"
+    $TS debug prefs 2>/dev/null | grep -iE 'routeall|exitnode' | sed 's/^/[diag]   /' || \
+        echo "[diag]   (could not read prefs)"
+    echo "[diag] resolving $host through tailscaled:"
+    $TS dns query "$host" A 2>&1 | sed 's/^/[diag]   /' | head -10
+    echo "[diag] reaching CoreDNS (10.43.0.10) over the tailnet:"
+    $TS ping --timeout=5s --c=1 10.43.0.10 2>&1 | sed 's/^/[diag]   /' | head -5
+    echo "[diag] HTTPS to $host via the HTTP proxy:"
+    curl -sS --max-time 20 -o /dev/null -w '[diag]   HTTP %{http_code} in %{time_total}s\n' \
+        --proxy "$HTTP_PROXY" "${GITEA_INSTANCE_URL}/api/v1/version" 2>&1 | sed 's/^curl/[diag]   curl/'
+    echo "[diag] HTTPS to $host via the SOCKS proxy:"
+    curl -sS --max-time 20 -o /dev/null -w '[diag]   HTTP %{http_code} in %{time_total}s\n' \
+        --proxy "$ALL_PROXY" "${GITEA_INSTANCE_URL}/api/v1/version" 2>&1 | sed 's/^curl/[diag]   curl/'
+    echo "--------------------------------------------------------------"
+}
+
+if [[ "${RUN_DIAGNOSTICS:-true}" == "true" ]]; then
+    diagnose
+fi
+
 # --- register (first run only) ----------------------------------------------
 if [[ ! -f state/.runner ]]; then
     [[ -n "${GITEA_RUNNER_REGISTRATION_TOKEN:-}" ]] || \
@@ -115,7 +145,7 @@ if [[ ! -f state/.runner ]]; then
         --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
         --name "${GITEA_RUNNER_NAME:-amp-ci-runner}" \
         --labels "${GITEA_RUNNER_LABELS:-self-hosted:host,linux:host,build:host,rust-ci:host}" \
-        || die "registration failed - check the token and that $GITEA_INSTANCE_URL is reachable over the tailnet"
+        || { diagnose; die "registration failed. If the diag lines above show HTTP 000 the runner cannot reach Gitea at all (routing or ACL); a real HTTP code means it reached Gitea and the token is the problem."; }
     log "registered"
 fi
 
