@@ -218,5 +218,31 @@
         "DefaultValue": "gcc gxx binutils make mold",
         "Placeholder": "gcc gxx binutils make mold",
         "EnumValues": {}
+    },
+    {
+        "DisplayName": "Poll Interval",
+        "Category": "Test Runner:memory",
+        "Subcategory": "Runner:tune:3",
+        "Description": "How often to poll Gitea for work. Gitea has no runner priority, and the first runner to poll wins the job, so a shorter interval here biases jobs to this runner without blocking - if it is busy or down the others still pick up.",
+        "Keywords": "poll,fetch,interval,priority",
+        "FieldName": "FetchInterval",
+        "InputType": "text",
+        "ParamFieldName": "FetchInterval",
+        "DefaultValue": "1s",
+        "Placeholder": "1s",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Max Poll Interval",
+        "Category": "Test Runner:memory",
+        "Subcategory": "Runner:tune:3",
+        "Description": "Ceiling for the poll interval. An idle runner backs off exponentially towards this, and a backed-off runner loses the race for a new job, so keep it low if you want this runner favoured.",
+        "Keywords": "poll,fetch,interval,priority",
+        "FieldName": "FetchIntervalMax",
+        "InputType": "text",
+        "ParamFieldName": "FetchIntervalMax",
+        "DefaultValue": "2s",
+        "Placeholder": "2s",
+        "EnumValues": {}
     }
 ]

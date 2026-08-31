@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-gcc"
+LAUNCHER_REV="2026-08-31-fetch"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -143,6 +143,13 @@ runner:
   file: $ROOT/state/.runner
   capacity: ${RUNNER_CAPACITY:-2}
   timeout: ${RUNNER_TIMEOUT:-3h}
+  # Gitea has no runner priority (go-gitea/gitea#27042). Runners poll for work
+  # and the first to poll wins, so a short interval biases jobs here without
+  # ever blocking: if this host is busy or down, the others pick up normally.
+  # fetch_interval_max matters as much as fetch_interval - an idle runner backs
+  # off exponentially, and a backed-off runner loses the race.
+  fetch_interval: ${FETCH_INTERVAL:-1s}
+  fetch_interval_max: ${FETCH_INTERVAL_MAX:-2s}
   action_shallow_clone: true
   envs:
     CI_CACHE_DIR: "$CI_CACHE_DIR"
