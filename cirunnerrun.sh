@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-hostsdiag"
+LAUNCHER_REV="2026-08-31-ns-global"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -39,6 +39,44 @@ run_interruptible() {
     return $rc
 }
 
+# --- /etc/hosts override (no root) -------------------------------------------
+# tailscaled in userspace mode cannot become the system resolver without root,
+# and proxied connections are resolved BY TAILSCALED, not by the client. So the
+# override has to cover tailscaled, which means re-execing the whole script
+# inside an unprivileged user+mount namespace before tailscaled starts.
+#
+# tailscale up is given --accept-dns=false below: inside the namespace
+# tailscaled believes it is root and would otherwise try to manage
+# /etc/resolv.conf, which it cannot actually write.
+HOSTS_FILE="$ROOT/state/hosts.extra.generated"
+
+if [[ "${HOSTS_NS_ACTIVE:-0}" != "1" ]]; then
+    if [[ -z "${EXTRA_HOSTS:-}" && -r "$ROOT/state/hosts.extra" ]]; then
+        EXTRA_HOSTS="$(grep -vE '^[[:space:]]*(#|$)' "$ROOT/state/hosts.extra" | paste -sd ';' -)"
+    fi
+    if [[ -n "${EXTRA_HOSTS:-}" ]]; then
+        if unshare --user --map-root-user --mount true 2>/dev/null; then
+            { cat /etc/hosts; echo; printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}"; } > "$HOSTS_FILE"
+            log "applying host entries in a private mount namespace:"
+            printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}" | sed 's/^/[ci-runner]   /'
+            export HOSTS_NS_ACTIVE=1 EXTRA_HOSTS
+            exec unshare --user --map-root-user --mount bash -c '
+                mount --bind "$1" /etc/hosts || { echo "[ci-runner] FATAL: bind mount failed" >&2; exit 71; }
+                shift
+                exec "$@"
+            ' _ "$HOSTS_FILE" "$0" "$@"
+        else
+            log "WARNING: unprivileged user namespaces are unavailable; host"
+            log "WARNING: entries cannot be applied and a tailnet-only hostname"
+            log "WARNING: will not resolve."
+        fi
+    else
+        log "no extra host entries configured (create state/hosts.extra with"
+        log "lines like '192.168.2.117 git.frostbyte.us')"
+    fi
+fi
+HOSTS_NS_OK="${HOSTS_NS_ACTIVE:-0}"
+
 # --- tailscale ---------------------------------------------------------------
 log "starting tailscaled (userspace networking)"
 ./bin/tailscaled \
@@ -57,7 +95,10 @@ done
 [[ -S "$ROOT/state/tailscaled.sock" ]] || die "tailscaled socket never appeared"
 
 TS="./bin/tailscale --socket=$ROOT/state/tailscaled.sock"
-up_args=(--authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-amp-ci-runner}")
+# --accept-dns=false: inside the mount namespace tailscaled believes it is
+# root and would try to manage /etc/resolv.conf, which it cannot write. We
+# resolve through /etc/hosts instead, so its DNS handling is unwanted.
+up_args=(--accept-dns=false --authkey="$TS_AUTHKEY" --hostname="${TS_HOSTNAME:-amp-ci-runner}")
 # Pulls in the routes the in-cluster subnet router advertises.
 [[ "${TS_ACCEPT_ROUTES:-true}" == "true" ]] && up_args+=(--accept-routes)
 
@@ -87,59 +128,6 @@ export PATH="$ROOT/rust/cargo/bin:$ROOT/node/bin:$ROOT/bin:$PATH"
 export CI_CACHE_DIR="$ROOT/cache/ci"
 mkdir -p "$CI_CACHE_DIR"
 [[ -x "$ROOT/rust/cargo/bin/sccache" ]] && export RUSTC_WRAPPER="$ROOT/rust/cargo/bin/sccache"
-
-# --- /etc/hosts override (no root) -------------------------------------------
-# tailscaled in userspace mode cannot become the system resolver without root,
-# and its SOCKS proxy resolves through the host's resolver - which knows nothing
-# about a tailnet-only domain. An unprivileged user+mount namespace lets us
-# bind-mount our own /etc/hosts over the real one for act_runner and everything
-# it spawns, without touching the host.
-#
-# Deliberately NOT applied to tailscaled: inside the namespace it would see
-# itself as root, try to manage /etc/resolv.conf, and fail in less obvious ways.
-HOSTS_NS_OK=0
-HOSTS_FILE="$ROOT/state/hosts"
-
-setup_hosts_override() {
-    # New template settings only reach an instance when AMP re-reads the
-    # template repository, which is awkward to force. state/hosts.extra is the
-    # escape hatch: create it in AMP's File Manager and it works immediately,
-    # with no template refresh and no instance rebuild.
-    if [[ -z "${EXTRA_HOSTS:-}" && -r "$ROOT/state/hosts.extra" ]]; then
-        EXTRA_HOSTS="$(grep -vE '^\s*(#|$)' "$ROOT/state/hosts.extra" | paste -sd ';' -)"
-        [[ -n "$EXTRA_HOSTS" ]] && log "host entries loaded from state/hosts.extra"
-    fi
-    if [[ -z "${EXTRA_HOSTS:-}" ]]; then
-        log "no extra host entries configured (set Extra Host Entries, or create"
-        log "state/hosts.extra with lines like '192.168.2.117 git.frostbyte.us')"
-        return 0
-    fi
-    { cat /etc/hosts; echo; printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}"; } > "$HOSTS_FILE"
-    if unshare --user --map-root-user --mount true 2>/dev/null; then
-        HOSTS_NS_OK=1
-        log "host entries will be applied in a private mount namespace:"
-        printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}" | sed 's/^/[ci-runner]   /'
-    else
-        log "WARNING: unprivileged user namespaces are unavailable on this host,"
-        log "WARNING: so the host entries cannot be applied. If Gitea is only"
-        log "WARNING: reachable by a tailnet-only name, registration will fail."
-    fi
-}
-
-# Runs a command with the overridden /etc/hosts when available, plainly otherwise.
-with_hosts() {
-    if [[ "$HOSTS_NS_OK" == "1" ]]; then
-        unshare --user --map-root-user --mount bash -c '
-            mount --bind "$1" /etc/hosts || exit 71
-            shift
-            exec "$@"
-        ' _ "$HOSTS_FILE" "$@"
-    else
-        "$@"
-    fi
-}
-
-setup_hosts_override
 
 # --- runner config -----------------------------------------------------------
 cat > state/config.yaml <<YAML
@@ -209,7 +197,7 @@ diagnose() {
     echo "[diag]   EXTRA_HOSTS=[${EXTRA_HOSTS:-}]"
     echo "[diag]   override active: ${HOSTS_NS_OK/1/yes}"
     if [[ "$HOSTS_NS_OK" == "1" ]]; then
-        with_hosts getent hosts "$host" 2>&1 | sed 's/^/[diag]   /' || \
+        getent hosts "$host" 2>&1 | sed 's/^/[diag]   /' || \
             echo "[diag]   $host not present in the override"
     fi
     echo "[diag] HTTPS to $host via the HTTP proxy:"
@@ -232,7 +220,7 @@ if [[ ! -f state/.runner ]]; then
     log "registering as ${GITEA_RUNNER_NAME:-amp-ci-runner}"
     # act_runner retries the instance ping indefinitely; without a bound a bad
     # route leaves the instance unstoppable rather than failing visibly.
-    run_interruptible with_hosts timeout "${REGISTER_TIMEOUT:-120}" \
+    run_interruptible timeout "${REGISTER_TIMEOUT:-120}" \
         ./bin/act_runner --config state/config.yaml register --no-interactive \
         --instance "$GITEA_INSTANCE_URL" \
         --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
@@ -264,7 +252,7 @@ cleanup() {
 trap cleanup TERM INT EXIT
 
 log "starting act_runner daemon"
-with_hosts ./bin/act_runner --config state/config.yaml daemon &
+./bin/act_runner --config state/config.yaml daemon &
 runner_pid=$!
 wait "$runner_pid"
 rc=$?
