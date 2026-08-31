@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-pkgconfig"
+LAUNCHER_REV="2026-08-31-sslstatic"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -143,6 +143,14 @@ if [[ -x "$ROOT/toolchain/bin/gcc" ]]; then
     # system paths by default and finds nothing here: OpenSSL and friends live
     # in the instance's conda prefix, not on the host.
     export PKG_CONFIG_PATH="$ROOT/toolchain/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    # Link OpenSSL statically. The shared libs here live in the instance's
+    # conda prefix, so a binary built on this runner and shipped into a
+    # container would look for a libssl that is not there. Static linking makes
+    # the artifact self-contained regardless of where it runs.
+    #
+    # Trade-off: a statically linked binary does not pick up OpenSSL security
+    # updates from the base image - it has to be rebuilt.
+    [[ -f "$ROOT/toolchain/lib/libssl.a" ]] && export OPENSSL_STATIC=1
 fi
 
 # --- runner config -----------------------------------------------------------
@@ -178,6 +186,7 @@ runner:
     NO_PROXY: "$NO_PROXY"
     TAR_OPTIONS: "$TAR_OPTIONS"
     PKG_CONFIG_PATH: "${PKG_CONFIG_PATH:-}"
+    OPENSSL_STATIC: "${OPENSSL_STATIC:-}"
     CARGO_HOME: "$CARGO_HOME"
     RUSTUP_HOME: "$RUSTUP_HOME"
     PATH: "$PATH"

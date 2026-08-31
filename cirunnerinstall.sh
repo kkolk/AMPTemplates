@@ -13,7 +13,7 @@ ACT_RUNNER_VERSION="${ACT_RUNNER_VERSION:-0.2.13}"
 TAILSCALE_VERSION="${TAILSCALE_VERSION:-1.86.2}"
 RUST_TOOLCHAIN="${RUST_TOOLCHAIN:-stable}"
 NODE_VERSION="${NODE_VERSION:-22.11.0}"
-TOOLCHAIN_PACKAGES="${TOOLCHAIN_PACKAGES:-gcc gxx binutils make cmake pkg-config openssl mold}"
+TOOLCHAIN_PACKAGES="${TOOLCHAIN_PACKAGES:-gcc gxx binutils make cmake pkg-config openssl libopenssl-static mold}"
 
 # The default locations, deliberately: workflows cache ~/.cargo/registry, and
 # pointing CARGO_HOME into the instance directory would make that cache a
@@ -99,7 +99,8 @@ if [[ ! -x bin/micromamba ]]; then
 fi
 
 if [[ ! -x "toolchain/bin/gcc" ]] || [[ ! -x "toolchain/bin/mold" ]] \
-   || [[ ! -x "toolchain/bin/ar" ]] || [[ ! -x "toolchain/bin/pkg-config" ]]; then
+   || [[ ! -x "toolchain/bin/ar" ]] || [[ ! -x "toolchain/bin/pkg-config" ]] \
+   || [[ ! -f "toolchain/lib/libssl.a" ]]; then
     echo ">> C toolchain: $TOOLCHAIN_PACKAGES (this is a few hundred MB)"
     MAMBA_ROOT_PREFIX="$ROOT/state/mamba" \
         ./bin/micromamba create -y -q -p "$ROOT/toolchain" -c conda-forge $TOOLCHAIN_PACKAGES
