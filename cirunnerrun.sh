@@ -100,7 +100,19 @@ HOSTS_NS_OK=0
 HOSTS_FILE="$ROOT/state/hosts"
 
 setup_hosts_override() {
-    [[ -n "${EXTRA_HOSTS:-}" ]] || return 0
+    # New template settings only reach an instance when AMP re-reads the
+    # template repository, which is awkward to force. state/hosts.extra is the
+    # escape hatch: create it in AMP's File Manager and it works immediately,
+    # with no template refresh and no instance rebuild.
+    if [[ -z "${EXTRA_HOSTS:-}" && -r "$ROOT/state/hosts.extra" ]]; then
+        EXTRA_HOSTS="$(grep -vE '^\s*(#|$)' "$ROOT/state/hosts.extra" | paste -sd ';' -)"
+        [[ -n "$EXTRA_HOSTS" ]] && log "host entries loaded from state/hosts.extra"
+    fi
+    if [[ -z "${EXTRA_HOSTS:-}" ]]; then
+        log "no extra host entries configured (set Extra Host Entries, or create"
+        log "state/hosts.extra with lines like '192.168.2.117 git.frostbyte.us')"
+        return 0
+    fi
     { cat /etc/hosts; echo; printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}"; } > "$HOSTS_FILE"
     if unshare --user --map-root-user --mount true 2>/dev/null; then
         HOSTS_NS_OK=1
