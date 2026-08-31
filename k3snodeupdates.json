@@ -1,0 +1,49 @@
+[
+    {
+        "UpdateStageName": "Create Node Directory",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Fetch Launcher Script",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/k3snoderun.sh",
+        "UpdateSourceArgs": "{{$FullRootDir}}run-node.sh",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Make Launcher Executable",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"chmod +x {{$FullRootDir}}run-node.sh\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Check Host Prerequisites",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"set -e; fail=0; command -v docker >/dev/null || { echo \\\"MISSING: docker is not installed on this host.\\\" >&2; fail=1; }; docker info >/dev/null 2>&1 || { echo \\\"MISSING: cannot reach the Docker daemon - add the AMP user to the docker group and restart AMP. See k3snodeREADME.md step 2.\\\" >&2; fail=1; }; test -r /etc/amp-k3s/secrets.env || { echo \\\"MISSING: /etc/amp-k3s/secrets.env is not readable by the AMP user. See k3snodeREADME.md step 1.\\\" >&2; fail=1; }; command -v tailscale >/dev/null || { echo \\\"MISSING: tailscale is not installed on this host. See k3snodeREADME.md step 3.\\\" >&2; fail=1; }; TSIP=$(tailscale ip -4 2>/dev/null | head -1) || true; if [ -n \\\"$TSIP\\\" ]; then echo \\\"Tailscale IPv4: $TSIP  <- put this in Extra Agent Arguments as --node-ip and --kubelet-arg=address\\\"; else echo \\\"MISSING: this host is not on the tailnet (tailscale up --accept-routes). See k3snodeREADME.md step 3.\\\" >&2; fail=1; fi; case \\\"{{ExtraAgentArgs}}\\\" in *TAILSCALE_IP*) echo \\\"ACTION REQUIRED: Extra Agent Arguments still contains the TAILSCALE_IP placeholder. Until you replace it, this node will register its PUBLIC IP and expose the kubelet on port 10250 to the internet.\\\" >&2; fail=1;; esac; test \\\"$fail\\\" = 0 && echo \\\"Preflight OK - host prerequisites are in place.\\\"; exit 0\"",
+        "SkipOnFailure": true
+    },
+    {
+        "UpdateStageName": "Check Control Plane Reachability",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"set -e; echo \\\"Checking reachability of {{K3sServerURL}} via the subnet router\\\"; curl -ksS --max-time 10 -o /dev/null -w \\\"control plane responded: HTTP %{http_code}\\\\n\\\" \\\"{{K3sServerURL}}/ping\\\" || echo \\\"WARNING: could not reach {{K3sServerURL}}. Check that the in-cluster subnet router advertises 192.168.2.0/24 and that this host ran tailscale up --accept-routes.\\\" >&2; exit 0\"",
+        "SkipOnFailure": true
+    },
+    {
+        "UpdateStageName": "Pull Node Image",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"set -e; echo \\\"Pulling {{NodeImage}}\\\"; docker pull \\\"{{NodeImage}}\\\"; echo \\\"Image ready: {{NodeImage}}\\\"\"",
+        "SkipOnFailure": false
+    }
+]

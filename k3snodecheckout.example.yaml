@@ -1,0 +1,63 @@
+# Example workflow step: mirror-backed checkout for jobs pinned to the AMP node.
+#
+# actions/checkout clones from scratch on every job. Across the link between the
+# datacenter and git.frostbyte.us that is the slowest thing in the build. This
+# keeps a persistent bare mirror on the runner's PVC and clones against it, so
+# each job transfers only objects the mirror does not already have.
+#
+# Requires, in the runner config (see k3snodegitea-runner.example.yaml):
+#   container.valid_volumes: [/data/git-mirror]
+#   container.options: "... -v /data/git-mirror:/git-mirror"
+
+name: build
+on: [push]
+
+jobs:
+  build:
+    runs-on: build
+    steps:
+      - name: Checkout via local mirror
+        run: |
+          set -euo pipefail
+          MIRROR="/git-mirror/${GITHUB_REPOSITORY}.git"
+          REMOTE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+
+          mkdir -p "$(dirname "$MIRROR")"
+
+          # capacity > 1 means two jobs can hit the same mirror at once, and
+          # concurrent fetches into one repo corrupt refs. Serialise them; the
+          # lock is held only for the fetch, not the checkout.
+          (
+            flock 9
+            if [ -d "$MIRROR" ]; then
+              echo "Updating mirror $MIRROR"
+              git -C "$MIRROR" fetch --prune --quiet origin \
+                '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+            else
+              echo "Seeding mirror $MIRROR (one-off full clone)"
+              git clone --mirror --quiet "$REMOTE" "$MIRROR"
+            fi
+          ) 9>"${MIRROR%.git}.lock"
+
+          # --reference makes the clone reuse the mirror's object store, so the
+          # network transfer is only what the fetch above did not already pull.
+          # No --dissociate: the workspace is thrown away after the job, and
+          # dissociating would copy every object back out, defeating the point.
+          git clone --reference "$MIRROR" --quiet "$REMOTE" .
+          git checkout --quiet "$GITHUB_SHA"
+          git log -1 --oneline
+
+      # Dependency caches ride the runner's built-in cache server. Adjust the
+      # paths to whatever your builds actually download.
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-
+
+      - name: Build
+        run: echo "build here"

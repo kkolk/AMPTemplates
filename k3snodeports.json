@@ -1,0 +1,23 @@
+[
+    {
+        "Protocol": "TCP",
+        "Port": 10250,
+        "Ref": "KubeletPort",
+        "Name": "Kubelet API (TCP)",
+        "Description": "Kubelet API, reached by the control plane over the tailnet. Does not need to be exposed to the internet."
+    },
+    {
+        "Protocol": "UDP",
+        "Port": 8472,
+        "Ref": "FlannelVXLANPort",
+        "Name": "Flannel VXLAN (UDP)",
+        "Description": "Flannel VXLAN overlay between nodes. Carried inside the tailnet when the Tailscale VPN integration is active."
+    },
+    {
+        "Protocol": "UDP",
+        "Port": 41641,
+        "Ref": "TailscalePort",
+        "Name": "Tailscale (UDP)",
+        "Description": "Tailscale direct-connection port. If blocked, Tailscale falls back to DERP relays."
+    }
+]

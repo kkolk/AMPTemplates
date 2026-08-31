@@ -1,0 +1,172 @@
+# Example: a gitea act_runner pinned to the AMP node, for ./apps/gitea-runner/
+# in the flux repo. Modelled on runner-w02.yaml; the differences are called out
+# in the comments below.
+#
+# NOT applied by this template - copy it into the flux repo when the node is up.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-runner-amp-config
+  namespace: apps
+data:
+  # As on w02, jobs run as sibling containers on the host's docker daemon,
+  # outside any pod cgroup, so container.options is the only real throttle.
+  # Size it to the datacenter host, not to the k3s node container's caps.
+  config.yaml: |
+    runner:
+      capacity: 2
+      # Action repos (actions/checkout et al) get fetched shallow and reused
+      # from cache instead of re-cloned from github on every job.
+      action_shallow_clone: true
+      # Bind-workdir task dirs live on the PVC; reap them after a day rather
+      # than letting them accumulate.
+      workdir_cleanup_age: 24h
+    cache:
+      # Built-in actions/cache server. This is where dependency caches live -
+      # cargo registry, node_modules, Go module cache. Bigger win for build
+      # times than git objects on their own.
+      enabled: true
+      dir: /data/cache
+      # Job containers are siblings on the host's docker bridge, so the cache
+      # server must be reachable there. hostNetwork on this pod puts it on the
+      # host, where 172.17.0.1 is the bridge gateway. VERIFY against your
+      # docker0 subnet: docker network inspect bridge.
+      host: "172.17.0.1"
+      port: 8088
+      offline_mode: true
+      retention: 168h
+      size_limit: 20GB
+    container:
+      # NOT force_pull. Unlike w02, this node pulls across the internet from
+      # git.frostbyte.us, and the host daemon's layer cache persists between
+      # jobs - re-pulling every time throws away the main advantage of running
+      # jobs on a long-lived host daemon.
+      force_pull: false
+      # Workspaces on the host filesystem rather than throwaway docker volumes,
+      # so the git mirror below can be referenced from them.
+      bind_workdir: true
+      workdir_parent: /data/workspace
+      # Whitelists what jobs may bind-mount. The mirror is the point.
+      valid_volumes:
+        - /data/git-mirror
+        - /data/workspace/*
+        - /var/cache/gitea-ci
+      # Same /ci-cache pattern as runner-1: a persistent host dir for cargo
+      # target dirs, opted into via CARGO_TARGET_DIR. sccache cannot cache
+      # clippy-driver output, so target/ fingerprints are what make re-lints
+      # cheap. Create /var/cache/gitea-ci on the AMP host first.
+      options: "--cpus 6 --memory 12g -v /data/git-mirror:/git-mirror --volume /var/cache/gitea-ci:/ci-cache"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-runner-amp-data
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-runner-amp
+  namespace: apps
+  labels:
+    app: gitea-runner-amp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea-runner-amp
+  template:
+    metadata:
+      labels:
+        app: gitea-runner-amp
+    spec:
+      # Puts the built-in cache server on the host, where job containers on
+      # the docker bridge can reach it. Also why dnsConfig below is required.
+      hostNetwork: true
+      # Same trick as w02: skip cluster DNS entirely. Here it is load-bearing
+      # rather than a preference - CoreDNS resolves to a ClusterIP that DNATs
+      # to a pod on the pod CIDR, which this node has no route to.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 192.168.2.117
+      serviceAccountName: gitea-runner
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/hostname: k3s-worker-amp
+      # The node carries dedicated=ci:NoSchedule so nothing else drifts onto a
+      # node the control plane cannot reach.
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: ci
+          effect: NoSchedule
+      containers:
+      - name: runner
+        image: gitea/act_runner:nightly-dind
+        command: ["/bin/sh", "-c", "mkdir -p /data/.docker && cp /runner/.docker/config.json /data/.docker/config.json && exec /usr/local/bin/run.sh"]
+        env:
+        - name: GITEA_INSTANCE_URL
+          value: "https://git.frostbyte.us"
+        - name: GITEA_RUNNER_REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: gitea-runner-secrets
+              key: registration-token
+        - name: GITEA_RUNNER_NAME
+          value: "runner-amp"
+        # rust-ci is the reason to build this node at all: 44 threads and
+        # 63 GB against the GPU node's 8c/13Gi. Adding it here does NOT remove
+        # it from runner-1 - Gitea will schedule workspace compiles to
+        # whichever is free. Drop rust-ci from runner-1 only once this one has
+        # proven itself.
+        - name: GITEA_RUNNER_LABELS
+          value: "self-hosted:host,docker:docker://node:20-bullseye,linux:host,build:host,rust-ci:docker://git.frostbyte.us/kkolk/rust-ci:stable"
+        - name: CONFIG_FILE
+          value: "/etc/act_runner/config.yaml"
+        - name: TZ
+          value: "America/New_York"
+        - name: DOCKER_CONFIG
+          value: "/data/.docker"
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        - name: runner-data
+          mountPath: /data
+        - name: registry-auth
+          mountPath: /runner/.docker
+        - name: runner-config
+          mountPath: /etc/act_runner
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+      volumes:
+      # Resolves to the AMP host's daemon, passed into the node container by
+      # run-node.sh when Pass Through Docker Socket is enabled.
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+      - name: runner-data
+        persistentVolumeClaim:
+          claimName: gitea-runner-amp-data
+      - name: registry-auth
+        secret:
+          secretName: gitea-registry
+          items:
+          - key: .dockerconfigjson
+            path: config.json
+      - name: runner-config
+        configMap:
+          name: gitea-runner-amp-config
