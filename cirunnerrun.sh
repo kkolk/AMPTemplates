@@ -87,6 +87,47 @@ export CI_CACHE_DIR="$ROOT/cache/ci"
 mkdir -p "$CI_CACHE_DIR"
 [[ -x "$ROOT/rust/cargo/bin/sccache" ]] && export RUSTC_WRAPPER="$ROOT/rust/cargo/bin/sccache"
 
+# --- /etc/hosts override (no root) -------------------------------------------
+# tailscaled in userspace mode cannot become the system resolver without root,
+# and its SOCKS proxy resolves through the host's resolver - which knows nothing
+# about a tailnet-only domain. An unprivileged user+mount namespace lets us
+# bind-mount our own /etc/hosts over the real one for act_runner and everything
+# it spawns, without touching the host.
+#
+# Deliberately NOT applied to tailscaled: inside the namespace it would see
+# itself as root, try to manage /etc/resolv.conf, and fail in less obvious ways.
+HOSTS_NS_OK=0
+HOSTS_FILE="$ROOT/state/hosts"
+
+setup_hosts_override() {
+    [[ -n "${EXTRA_HOSTS:-}" ]] || return 0
+    { cat /etc/hosts; echo; printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}"; } > "$HOSTS_FILE"
+    if unshare --user --map-root-user --mount true 2>/dev/null; then
+        HOSTS_NS_OK=1
+        log "host entries will be applied in a private mount namespace:"
+        printf '%s\n' "${EXTRA_HOSTS//;/$'\n'}" | sed 's/^/[ci-runner]   /'
+    else
+        log "WARNING: unprivileged user namespaces are unavailable on this host,"
+        log "WARNING: so the host entries cannot be applied. If Gitea is only"
+        log "WARNING: reachable by a tailnet-only name, registration will fail."
+    fi
+}
+
+# Runs a command with the overridden /etc/hosts when available, plainly otherwise.
+with_hosts() {
+    if [[ "$HOSTS_NS_OK" == "1" ]]; then
+        unshare --user --map-root-user --mount bash -c '
+            mount --bind "$1" /etc/hosts || exit 71
+            shift
+            exec "$@"
+        ' _ "$HOSTS_FILE" "$@"
+    else
+        "$@"
+    fi
+}
+
+setup_hosts_override
+
 # --- runner config -----------------------------------------------------------
 cat > state/config.yaml <<YAML
 log:
@@ -137,6 +178,11 @@ diagnose() {
     $TS dns query "$host" A 2>&1 | sed 's/^/[diag]   /' | head -10
     echo "[diag] reaching CoreDNS (10.43.0.10) over the tailnet:"
     $TS ping --timeout=5s --c=1 10.43.0.10 2>&1 | sed 's/^/[diag]   /' | head -5
+    echo "[diag] /etc/hosts override active: ${HOSTS_NS_OK/1/yes}"
+    if [[ "$HOSTS_NS_OK" == "1" ]]; then
+        with_hosts getent hosts "$host" 2>&1 | sed 's/^/[diag]   /' || \
+            echo "[diag]   $host not present in the override"
+    fi
     echo "[diag] HTTPS to $host via the HTTP proxy:"
     curl -sS --max-time 20 -o /dev/null -w '[diag]   HTTP %{http_code} in %{time_total}s\n' \
         --proxy "$HTTP_PROXY" "${GITEA_INSTANCE_URL}/api/v1/version" 2>&1 | sed 's/^curl/[diag]   curl/'
@@ -157,7 +203,7 @@ if [[ ! -f state/.runner ]]; then
     log "registering as ${GITEA_RUNNER_NAME:-amp-ci-runner}"
     # act_runner retries the instance ping indefinitely; without a bound a bad
     # route leaves the instance unstoppable rather than failing visibly.
-    run_interruptible timeout "${REGISTER_TIMEOUT:-120}" \
+    run_interruptible with_hosts timeout "${REGISTER_TIMEOUT:-120}" \
         ./bin/act_runner --config state/config.yaml register --no-interactive \
         --instance "$GITEA_INSTANCE_URL" \
         --token "$GITEA_RUNNER_REGISTRATION_TOKEN" \
@@ -189,7 +235,7 @@ cleanup() {
 trap cleanup TERM INT EXIT
 
 log "starting act_runner daemon"
-./bin/act_runner --config state/config.yaml daemon &
+with_hosts ./bin/act_runner --config state/config.yaml daemon &
 runner_pid=$!
 wait "$runner_pid"
 rc=$?
