@@ -11,7 +11,7 @@
         "UpdateSourcePlatform": "Linux",
         "UpdateSource": "Executable",
         "UpdateSourceData": "/bin/bash",
-        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; curl -fL --retry 3 -o run.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerrun.sh\\\"; curl -fL --retry 3 -o install.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerinstall.sh\\\"; chmod +x run.sh install.sh; echo \\\"launcher and installer refreshed\\\"\"",
+        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; SHA=$(curl -fsSL \\\"https://api.github.com/repos/kkolk/AMPTemplates/commits/main\\\" | grep -m1 '\\\"sha\\\"' | cut -d'\\\"' -f4); [ -n \\\"$SHA\\\" ] || { echo \\\"could not resolve commit sha\\\" >&2; exit 1; }; echo \\\"fetching scripts at commit $SHA\\\"; curl -fL --retry 3 -o run.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/$SHA/cirunnerrun.sh\\\"; curl -fL --retry 3 -o install.sh \\\"https://raw.githubusercontent.com/kkolk/AMPTemplates/$SHA/cirunnerinstall.sh\\\"; chmod +x run.sh install.sh; grep -m1 LAUNCHER_REV run.sh\"",
         "SkipOnFailure": false
     },
     {
