@@ -14,13 +14,19 @@ TAILSCALE_VERSION="${TAILSCALE_VERSION:-1.86.2}"
 RUST_TOOLCHAIN="${RUST_TOOLCHAIN:-stable}"
 NODE_VERSION="${NODE_VERSION:-22.11.0}"
 
+# The default locations, deliberately: workflows cache ~/.cargo/registry, and
+# pointing CARGO_HOME into the instance directory would make that cache a
+# silent no-op. Overridable if a future instance needs isolation.
+export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+
 case "$(uname -m)" in
     x86_64)        GOARCH=amd64; NODEARCH=x64 ;;
     aarch64|arm64) GOARCH=arm64; NODEARCH=arm64 ;;
     *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 
-mkdir -p bin state cache git-mirror workspace toolcache
+mkdir -p bin state cache git-mirror workspace toolcache "$CARGO_HOME/bin"
 
 fetch() { curl -fL --retry 3 --progress-bar -o "$1" "$2"; }
 
@@ -47,9 +53,7 @@ fi
 # Host-executor jobs need the toolchain in the instance dir, since there is no
 # rust-ci container to provide it. rustup installs entirely under $HOME-style
 # paths, which we point inside the instance.
-export RUSTUP_HOME="$ROOT/rust/rustup"
-export CARGO_HOME="$ROOT/rust/cargo"
-if [[ ! -x rust/cargo/bin/cargo ]]; then
+if [[ ! -x "$CARGO_HOME/bin/cargo" ]]; then
     echo ">> rust $RUST_TOOLCHAIN"
     fetch /tmp/rustup-init.sh https://sh.rustup.rs
     sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal \
@@ -57,22 +61,22 @@ if [[ ! -x rust/cargo/bin/cargo ]]; then
     rm -f /tmp/rustup-init.sh
 else
     echo ">> rust: updating $RUST_TOOLCHAIN"
-    rust/cargo/bin/rustup update "$RUST_TOOLCHAIN"
+    "$CARGO_HOME/bin/rustup" update "$RUST_TOOLCHAIN"
 fi
 
 # Tools the rust-ci jobs invoke directly. cargo-binstall fetches prebuilt
 # binaries so this stage does not turn into a from-source compile.
-if [[ ! -x rust/cargo/bin/cargo-binstall ]]; then
+if [[ ! -x "$CARGO_HOME/bin/cargo-binstall" ]]; then
     echo ">> cargo-binstall"
     fetch /tmp/binstall.tgz \
         "https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-$(uname -m)-unknown-linux-musl.tgz"
-    tar xzf /tmp/binstall.tgz -C rust/cargo/bin
+    tar xzf /tmp/binstall.tgz -C "$CARGO_HOME/bin"
     rm -f /tmp/binstall.tgz
 fi
 for tool in cargo-hakari sccache cargo-nextest; do
-    if [[ ! -x "rust/cargo/bin/${tool}" ]]; then
+    if [[ ! -x "$CARGO_HOME/bin/${tool}" ]]; then
         echo ">> $tool"
-        rust/cargo/bin/cargo-binstall --no-confirm --no-symlinks "$tool" || \
+        "$CARGO_HOME/bin/cargo-binstall" --no-confirm --no-symlinks "$tool" || \
             echo "WARNING: could not install $tool - jobs needing it will fail" >&2
     fi
 done
@@ -93,5 +97,5 @@ echo
 echo "Installed into $ROOT:"
 printf '  act_runner %s\n' "$(bin/act_runner --version 2>/dev/null | head -1)"
 printf '  tailscale  %s\n' "$(bin/tailscaled --version 2>/dev/null | head -1)"
-printf '  cargo      %s\n' "$(rust/cargo/bin/cargo --version 2>/dev/null)"
+printf '  cargo      %s\n' "$("$CARGO_HOME/bin/cargo" --version 2>/dev/null)"
 printf '  node       %s\n' "$(node/bin/node --version 2>/dev/null)"

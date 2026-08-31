@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-ns-global"
+LAUNCHER_REV="2026-08-31-cargohome"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -120,14 +120,14 @@ export NO_PROXY="localhost,127.0.0.1,::1"
 export no_proxy="$NO_PROXY"
 
 # --- toolchain on PATH for host-executor jobs --------------------------------
-export RUSTUP_HOME="$ROOT/rust/rustup"
-export CARGO_HOME="$ROOT/rust/cargo"
-export PATH="$ROOT/rust/cargo/bin:$ROOT/node/bin:$ROOT/bin:$PATH"
+export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+export PATH="$CARGO_HOME/bin:$ROOT/node/bin:$ROOT/bin:$PATH"
 # Workflows read this instead of a hardcoded /ci-cache, which cannot be created
 # without root. See cirunnerREADME.md for the one-line workflow change.
 export CI_CACHE_DIR="$ROOT/cache/ci"
 mkdir -p "$CI_CACHE_DIR"
-[[ -x "$ROOT/rust/cargo/bin/sccache" ]] && export RUSTC_WRAPPER="$ROOT/rust/cargo/bin/sccache"
+[[ -x "$CARGO_HOME/bin/sccache" ]] && export RUSTC_WRAPPER="$CARGO_HOME/bin/sccache"
 
 # --- runner config -----------------------------------------------------------
 cat > state/config.yaml <<YAML
