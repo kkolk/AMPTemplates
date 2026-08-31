@@ -15,6 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
+LAUNCHER_REV="2026-08-31-hostsdiag"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -190,7 +191,23 @@ diagnose() {
     $TS dns query "$host" A 2>&1 | sed 's/^/[diag]   /' | head -10
     echo "[diag] reaching CoreDNS (10.43.0.10) over the tailnet:"
     $TS ping --timeout=5s --c=1 10.43.0.10 2>&1 | sed 's/^/[diag]   /' | head -5
-    echo "[diag] /etc/hosts override active: ${HOSTS_NS_OK/1/yes}"
+    echo "[diag] hosts override:"
+    echo "[diag]   launcher revision: ${LAUNCHER_REV:-unknown}"
+    echo "[diag]   looking for: $ROOT/state/hosts.extra"
+    if [[ -r "$ROOT/state/hosts.extra" ]]; then
+        echo "[diag]   found, contents:"
+        sed 's/^/[diag]     /' "$ROOT/state/hosts.extra"
+    else
+        echo "[diag]   NOT FOUND or unreadable - this is why the override is off"
+        ls -la "$ROOT/state/" 2>&1 | sed 's/^/[diag]     /' | head -12
+    fi
+    if unshare --user --map-root-user --mount true 2>/dev/null; then
+        echo "[diag]   unprivileged user namespaces: available"
+    else
+        echo "[diag]   unprivileged user namespaces: BLOCKED by kernel"
+    fi
+    echo "[diag]   EXTRA_HOSTS=[${EXTRA_HOSTS:-}]"
+    echo "[diag]   override active: ${HOSTS_NS_OK/1/yes}"
     if [[ "$HOSTS_NS_OK" == "1" ]]; then
         with_hosts getent hosts "$host" 2>&1 | sed 's/^/[diag]   /' || \
             echo "[diag]   $host not present in the override"
