@@ -1,0 +1,33 @@
+[
+    {
+        "UpdateStageName": "Create Runner Directory",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Fetch Launcher Script",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerrun.sh",
+        "UpdateSourceArgs": "{{$FullRootDir}}run.sh",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Fetch Installer Script",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://raw.githubusercontent.com/kkolk/AMPTemplates/main/cirunnerinstall.sh",
+        "UpdateSourceArgs": "{{$FullRootDir}}install.sh",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Install Runner, Tailscale and Toolchains",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"set -e; cd \\\"{{$FullRootDir}}\\\"; chmod +x run.sh install.sh; exec ./install.sh \\\"{{$FullRootDir}}\\\"\"",
+        "SkipOnFailure": false
+    }
+]

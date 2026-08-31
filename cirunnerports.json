@@ -1,0 +1,9 @@
+[
+    {
+        "Protocol": "TCP",
+        "Port": 8088,
+        "Ref": "CachePort",
+        "Name": "Actions Cache Server (TCP)",
+        "Description": "act_runner's built-in actions/cache server. Bound to localhost; host-executor jobs reach it there. Does not need to be exposed."
+    }
+]
