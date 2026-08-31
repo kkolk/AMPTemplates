@@ -15,7 +15,7 @@ cd "$ROOT"
 log() { printf '[ci-runner] %s\n' "$*"; }
 die() { printf '[ci-runner] FATAL: %s\n' "$*" >&2; exit 1; }
 
-LAUNCHER_REV="2026-08-31-capacity"
+LAUNCHER_REV="2026-08-31-tar"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 HTTP_PROXY_PORT="${HTTP_PROXY_PORT:-1056}"
 
@@ -117,6 +117,12 @@ export HTTPS_PROXY="$HTTP_PROXY"
 export http_proxy="$HTTP_PROXY" https_proxy="$HTTP_PROXY"
 # The runner's own cache server is local; proxying it would deadlock.
 export NO_PROXY="localhost,127.0.0.1,::1"
+# Inside the mount namespace the process believes it is root, so GNU tar tries
+# to apply archives' stored ownership and fails: only uid 0 is mapped, so a
+# chown to any other uid returns EINVAL. actions/setup-node hits this
+# extracting the Node tarball. --map-current-user would avoid it but cannot
+# perform the bind mount, so suppress the chown instead.
+export TAR_OPTIONS="--no-same-owner"
 export no_proxy="$NO_PROXY"
 
 # --- toolchain on PATH for host-executor jobs --------------------------------
@@ -166,6 +172,7 @@ runner:
     HTTP_PROXY: "$HTTP_PROXY"
     HTTPS_PROXY: "$HTTPS_PROXY"
     NO_PROXY: "$NO_PROXY"
+    TAR_OPTIONS: "$TAR_OPTIONS"
     CARGO_HOME: "$CARGO_HOME"
     RUSTUP_HOME: "$RUSTUP_HOME"
     PATH: "$PATH"
