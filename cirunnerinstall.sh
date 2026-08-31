@@ -53,7 +53,7 @@ if [[ ! -x rust/cargo/bin/cargo ]]; then
     echo ">> rust $RUST_TOOLCHAIN"
     fetch /tmp/rustup-init.sh https://sh.rustup.rs
     sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal \
-        --default-toolchain "$RUST_TOOLCHAIN" --component rustfmt clippy
+        --default-toolchain "$RUST_TOOLCHAIN" --component rustfmt --component clippy
     rm -f /tmp/rustup-init.sh
 else
     echo ">> rust: updating $RUST_TOOLCHAIN"
