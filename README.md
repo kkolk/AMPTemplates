@@ -1,53 +1,36 @@
-# AMP Templates
-For the AMP community to share Generic Module templates.
+# kkolk AMP Templates
 
-# Making generic module templates
-See the wiki article for the module: https://github.com/CubeCoders/AMP/wiki/Configuring-the-'Generic'-AMP-module
+Personal [AMP](https://cubecoders.com/AMP) Generic Module templates. Forked from
+[CubeCoders/AMPTemplates](https://github.com/CubeCoders/AMPTemplates); the
+upstream templates have been removed, since AMP ships that repository as a
+template source already. Only the templates below live here.
 
-You can also use the online configurator at https://config.getamp.sh/ to help with building templates.
+Add as a template source in AMP under **Configuration → Instance Deployment →
+Template Repositories**:
 
-*There is a much more robust version of the [online configuration tool](https://iceofwraith.github.io/GenericConfigGen/) that is still in beta. This should provide much better results than the above even so. If you have any feedback, please contact IceOfWraith in the CubeCoders Discord.
+```
+https://github.com/kkolk/AMPTemplates
+```
 
-**The online configurator can be used as a starting point for making templates. However, it will not generally produce a fully functioning template. Templates produced using the generator can be deployed for personal use but will not be accepted into the CubeCoders repository.**
+## Templates
 
-# Sharing Templates
-Right now the following restrictions apply to templates that may be publicly shared via this repository (some of these will be relaxed over time):
+| Template | What it is |
+|---|---|
+| **CI Runner (Tailscale)** — `cirunner*` | Self-contained Gitea Actions runner. Runs entirely as the unprivileged AMP user — no root, no container runtime — and reaches a tailnet-only Gitea through userspace Tailscale. [Setup](cirunnerREADME.md) |
+| **k3s Node (CI)** — `k3snode*` | Joins the host to a remote k3s cluster as a tainted agent node in a privileged container. Needs root on the host; kept for hosts where that is available. [Setup](k3snodeREADME.md) |
+| **Extraction** — `extraction*` | Dedicated server for [Extraction](https://github.com/aleccarper/extraction). |
 
- - The application must not require any login/authentication in order to download (except for SteamCMD logins).
- - If the application does not have a Linux version you should add a Proton download via SteamCMD to support it if possible.
- - Applications that have customizable settings must use a Settings Manifest.
- - Only applications that expose some kind of Console that AMP is able to pick up.
- - Do not invoke any shell scripts/batch files. You must only launch actual executables.
- 
-# To share a template
+`CI Runner` and `k3s Node` are two answers to the same problem — putting CI on a
+remote AMP host. Which one applies depends entirely on whether you have root
+there. `CI Runner` does not need it.
 
-Create a pull request containing the following files in the top-level directory of the repository:
+## Note on the file layout
 
-    *APPLICATIONAME*.kvp
-    *APPLICATIONAME*config.json
-    *APPLICATIONAME*metaconfig.json (Optional)
+AMP discovers templates by their `.kvp` file and resolves the sibling
+`*config.json`, `*ports.json`, `*updates.json` and `*metaconfig.json` by name
+prefix, so everything sits flat at the repository root. `manifest.json` carries
+the repository-level metadata AMP reads when adding the source.
 
-With the names fully lower-cased.
-
-For example, `valheim.kvp`, `valheimconfig.json`, `valheimmetaconfig.json`
-
-Do not use any directories and include no-other files.
-
-**If you are only submitting a draft, make sure to append (draft) to the pull request title.**
-
-# Editing templates
-
-If you believe that a template needs either updating or changes made, please submit a pull request for that template with a justification for why that change is needed. If possible try and contact the original author first.
-
-# After submitting a template
-
-Once you've submitted a pull request, your configuration will be tested in its as-is state by an automated tool. It will:
-
-- Load the configuration
-- Attempt to perform an update
-- Attempt to start the application
-- Verify that the application reaches the 'Ready' state.
-- Attempt to stop the application
-- Verify that the application reaches the 'Stopped' state.
-
-You should ensure that your configuration can do this on both Windows and Linux before submitting your configuration.
+**Do not rename this repository.** The `CI Runner` and `k3s Node` update stages
+fetch their launcher scripts from `raw.githubusercontent.com` on this path;
+renaming breaks the next Update on any live instance.
