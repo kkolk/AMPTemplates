@@ -8,21 +8,68 @@ Built for a shared datacenter host where you have an AMP panel and nothing else.
 
 ## How it reaches Gitea
 
-`git.frostbyte.us` is tailnet-only, so Tailscale is required, not optional. The
-instance runs `tailscaled --tun=userspace-networking`, which needs neither
-`/dev/net/tun` nor `NET_ADMIN` — that is what makes the whole thing rootless.
+`git.frostbyte.us` is tailnet-only, so Tailscale is required. The instance runs
+`tailscaled --tun=userspace-networking`, which needs neither `/dev/net/tun` nor
+`NET_ADMIN` — that is what makes the whole thing rootless.
 
-Userspace mode gives no network interface, only proxies, so the launcher exports:
+Userspace mode gives no network interface, only proxies, so the launcher exports
+`ALL_PROXY` (SOCKS5) and `HTTP(S)_PROXY` (HTTP CONNECT) on localhost, with
+`NO_PROXY` covering the local cache server.
 
-| Variable | Value | Used by |
-|---|---|---|
-| `ALL_PROXY` | `socks5h://127.0.0.1:1055` | `git` |
-| `HTTP(S)_PROXY` | `http://127.0.0.1:1056` | act_runner, node-based actions |
-| `NO_PROXY` | `localhost,127.0.0.1,::1` | the local cache server |
+### Name resolution — the part that is not obvious
 
-**The `h` in `socks5h` is load-bearing.** It makes the proxy resolve hostnames.
-Without it `git.frostbyte.us` is resolved locally, where it does not exist, and
-every fetch fails with a DNS error that looks nothing like a proxy problem.
+Rootless userspace mode cannot resolve a tailnet-only hostname, and no amount of
+Tailscale DNS configuration fixes it:
+
+- tailscaled cannot write `/etc/resolv.conf` without root, so it never becomes
+  the system resolver (`dns: using dns.noopManager`).
+- Its internal resolver *does* hold the split-DNS routes, but nothing consults
+  it — `tailscale dns query` returns SERVFAIL and the proxies use the host
+  resolver at `127.0.0.53`.
+- **Proxied connections are resolved by tailscaled, not by the client.**
+  `act_runner` sends `CONNECT git.frostbyte.us:443` and tailscaled does the
+  lookup, so overriding resolution for `act_runner` alone changes nothing.
+
+The fix is a static hosts entry applied to the **whole process tree**. The
+launcher re-execs itself inside an unprivileged user + mount namespace and
+bind-mounts a generated hosts file over `/etc/hosts`, before tailscaled starts.
+Nothing on the host is modified, and no privileges are required beyond the
+kernel permitting unprivileged user namespaces.
+
+`tailscale up` passes `--accept-dns=false`: inside the namespace tailscaled
+believes it is root and would otherwise try to manage `/etc/resolv.conf`, which
+it cannot write. Its DNS handling is unwanted once `/etc/hosts` answers.
+
+Expect `dns-forward-failing` warnings in the log — tailscaled complaining it
+cannot reach the tailnet's configured DNS servers. Cosmetic; resolution does not
+go through them.
+
+### Setting the host entries
+
+Either the **Extra Host Entries** setting, or `state/hosts.extra` in the
+instance directory, one `IP hostname` pair per line. The file is the escape
+hatch: new template settings only reach an instance when AMP re-reads the
+template repository, whereas the file works immediately via the File Manager.
+
+```
+192.168.2.117 git.frostbyte.us
+```
+
+This pins an IP. If Traefik moves off `192.168.2.117`, jobs fail with connection
+errors rather than DNS errors.
+
+## Updating the launcher
+
+`raw.githubusercontent.com` caches branch paths for several minutes and ignores
+both cache-busting query strings and `Cache-Control: no-cache`, so fetching
+`.../main/...` can install a stale script. The update stage resolves the current
+commit SHA through the GitHub API and fetches the immutable per-commit URL
+instead, and prints `LAUNCHER_REV` so the installed revision is visible.
+
+`run.sh` also logs its revision into the diagnostics block. **Check it first**
+when a fix appears not to have taken — a stale launcher makes everything below
+it meaningless. Uploading `cirunnerrun.sh` directly through the File Manager
+bypasses the CDN entirely.
 
 ## What it can and cannot run
 
@@ -110,7 +157,7 @@ Nothing here has been run. Most likely to need attention:
   proxy set, the fix is a `NO_PROXY` listing the public hosts.
 - **`actions/checkout` under a SOCKS proxy.** It shells out to `git` and also
   makes its own HTTP calls; the two honour different proxy variables, which is
-  why both are exported.
+  why both are exported. Registration working does not prove checkout works.
 - Whether `cargo-binstall` has prebuilt binaries for all three tools on this
   architecture; the installer warns rather than failing if one is missing.
 - Whether act_runner's host executor finds the toolchain on `PATH` for every
