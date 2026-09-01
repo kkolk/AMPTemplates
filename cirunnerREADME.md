@@ -74,12 +74,20 @@ bypasses the CDN entirely.
 ## What it can and cannot run
 
 Everything advertised maps to the `:host` executor. Label→executor mapping is
-**per-runner**, so this runner takes `rust-ci:host` while `runner-1` keeps
-`rust-ci:docker://…` — the same `runs-on: [rust-ci]` jobs, no workflow changes.
+**per-runner**: this runner serves `rust-ci` as a host executor, while the
+k8s `rust-ci` pool (the `runner-rust-fallback` standby in
+flux `apps/gitea-runner`, kept `disabled` in Gitea while this runner is
+online and enabled by a watchdog CronJob when it goes offline) serves it via
+`docker://git.frostbyte.us/kkolk/rust-ci:stable` — the same
+`runs-on: [rust-ci]` jobs, no workflow changes. `runner-1` no longer holds
+the plain label; it advertises `rust-ci-gpu` (same image) for rata's deploy
+compile, which must stay on the gpu node for the /ci-cache handoff.
 
 **Runs here:** `toolkit`'s rust-ci jobs, `rata`'s `lint` (fmt, hakari, seam
-scripts), and any compile/test/lint work. The instance ships rustup with
-rustfmt and clippy, `cargo-hakari`, `sccache`, `cargo-nextest`, and Node.
+scripts), `shell-scripts`, `check`, and any compile/test/lint work. The
+instance ships rustup with rustfmt and clippy, `cargo-hakari`, `sccache`,
+`cargo-nextest`, and Node.
+
 
 **Cannot run here, keep on the homelab runners:** anything invoking the Docker
 CLI (`nanobot`, `rata`'s `docker buildx build --load` image job) and any job with
@@ -87,19 +95,15 @@ a top-level `container:` key. There is no container runtime. Do not advertise
 the `docker` label — a job that lands here and shells out to `docker` fails
 partway through, which is worse than never being scheduled.
 
-### One workflow change you need to make
+### The workflow change this depends on (already applied)
 
-`rata`'s `check` job hardcodes `CARGO_TARGET_DIR: /ci-cache/rata/target`.
-Creating `/ci-cache` needs root. The launcher exports `CI_CACHE_DIR` pointing
-inside the instance, so change that line to:
-
-```yaml
-CARGO_TARGET_DIR: ${CI_CACHE_DIR:-/ci-cache}/rata/target
-```
-
-That keeps the homelab runners working unchanged — they have `/ci-cache` and no
-`CI_CACHE_DIR` — while letting this one use its own directory. The job's
-existing prune step needs the same treatment.
+`rata` resolves its target dir per runner since PR #2611 (merged
+2026-08-31): a `$GITEA_ENV` step sets
+`CARGO_TARGET_DIR=${CI_CACHE_DIR:-/ci-cache}/rata/target`, and the prune
+step expands the same default. Repos that still hardcode `/ci-cache` will
+fail on this runner with a mkdir permission error — apply the same
+`${CI_CACHE_DIR:-/ci-cache}` treatment before pointing their `rust-ci` jobs
+here.
 
 ## Caching
 
