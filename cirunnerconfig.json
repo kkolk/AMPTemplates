@@ -54,13 +54,13 @@
         "DisplayName": "Extra Host Entries",
         "Category": "Test Runner:memory",
         "Subcategory": "Gitea:cloud:1",
-        "Description": "Static name-to-IP mappings, one per line or separated by ';' (e.g. '192.168.2.117 git.frostbyte.us'). Applied via an unprivileged mount namespace, so no root and nothing on the host changes. Needed because tailscaled in userspace mode cannot become the system resolver, so a tailnet-only hostname will not otherwise resolve.",
+        "Description": "Static name-to-IP mappings, one per line or separated by ';' (e.g. '192.168.2.117 git.frostbyte.us;192.168.2.117 minio.frostbyte.us'). Applied via an unprivileged mount namespace, so no root and nothing on the host changes. Needed because tailscaled in userspace mode cannot become the system resolver, so a tailnet-only hostname will not otherwise resolve. minio is required by any workflow using the shared sccache bucket - without it sccache's server fails to start and every cargo invocation (RUSTC_WRAPPER probe included) aborts.",
         "Keywords": "hosts,dns,resolve,static,etc-hosts",
         "FieldName": "ExtraHostEntries",
         "InputType": "text",
         "ParamFieldName": "ExtraHostEntries",
-        "DefaultValue": "192.168.2.117 git.frostbyte.us",
-        "Placeholder": "192.168.2.117 git.frostbyte.us",
+        "DefaultValue": "192.168.2.117 git.frostbyte.us;192.168.2.117 minio.frostbyte.us",
+        "Placeholder": "192.168.2.117 git.frostbyte.us;192.168.2.117 minio.frostbyte.us",
         "EnumValues": {}
     },
     {

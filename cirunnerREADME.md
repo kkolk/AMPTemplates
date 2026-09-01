@@ -53,6 +53,7 @@ template repository, whereas the file works immediately via the File Manager.
 
 ```
 192.168.2.117 git.frostbyte.us
+192.168.2.117 minio.frostbyte.us
 ```
 
 This pins an IP. If Traefik moves off `192.168.2.117`, jobs fail with connection
@@ -152,16 +153,24 @@ nowhere better to put them; anyone with AMP admin on this instance can read them
 The `k3snode*` files are the earlier design for the same host and still work if
 you ever get root there. This template needs none of it.
 
-## Not yet verified
+## Verified in production (2026-09-01, rata CI run 15620)
 
-Nothing here has been run. Most likely to need attention:
+The first full rata CI pass on this runner confirmed:
 
-- **Whether Tailscale's userspace proxies pass non-tailnet traffic through.**
-  Jobs also fetch from crates.io, npm and nodejs.org. If those break with the
-  proxy set, the fix is a `NO_PROXY` listing the public hosts.
-- **`actions/checkout` under a SOCKS proxy.** It shells out to `git` and also
-  makes its own HTTP calls; the two honour different proxy variables, which is
-  why both are exported. Registration working does not prove checkout works.
+- **Userspace proxies pass public traffic** — npm registry, `actions/checkout`,
+  and `actions/setup-node` all worked with the proxy exported. No `NO_PROXY`
+  additions needed.
+- **checkout under the SOCKS/HTTP proxies works** (lint, shell-scripts, check
+  all completed their checkout steps).
+- **Tailnet hostnames beyond git need pins too**: `minio.frostbyte.us` was
+  missing from the hosts override, sccache's server failed to start, and —
+  because cargo probes `RUSTC_WRAPPER` on every invocation — every cargo
+  step died instantly, `cargo fetch` in unrelated jobs included. Both pins
+  now ship as the Extra Host Entries default; add minio to `state/hosts.extra`
+  on instances created before that default existed.
+
+Still unverified:
+
 - Whether `cargo-binstall` has prebuilt binaries for all three tools on this
   architecture; the installer warns rather than failing if one is missing.
 - Whether act_runner's host executor finds the toolchain on `PATH` for every
